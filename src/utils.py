@@ -18,3 +18,21 @@ def request_url(url: str, headers: Optional[dict] = None) -> requests.Response:
     session.mount('https://', adapter)
 
     return session.get(url, headers=headers)
+
+
+def format_prices(prices: dict) -> str:
+    """
+    Format prices.
+    :param prices: Prices dict
+    :return: Formatted prices
+    """
+    return "\n".join([f"{fuel} - *{price}*" for fuel, price in prices.items()])
+
+
+def format_price(price: float) -> float:
+    """
+    Format price.
+    :param price: Price
+    :return: Formatted price
+    """
+    return abs(round(price, 2))

@@ -1,29 +1,17 @@
 # -*- coding: utf-8 -*-
 
-import os
 import json
 import logging
-from pathlib import Path
 
-import aioredis
-from environs import Env
-from aiogram import Bot, Dispatcher, executor, types
-from aiogram.contrib.fsm_storage.redis import RedisStorage2
+from aiogram import Dispatcher, executor, types
 
+from src.utils import format_prices
 from src.decorators import rate_limit
 from src.middleware import ThrottlingMiddleware
 from src.redis import add_user, get_user, unsubscribe_user, get_prices
+from src.config import redis, bot, storage
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-env = Env()
-env.read_env(os.path.join(BASE_DIR, '.env'))
-
-storage = RedisStorage2(db=env.int('REDIS_DB'))
-redis = aioredis.from_url("redis://localhost/" + env.str('REDIS_DB'))
-
-# Initialize bot and dispatcher
-bot = Bot(token=env.str("TOKEN"))
+# Initialize dispatcher
 dp = Dispatcher(bot, storage=storage)
 
 # Messages
@@ -37,7 +25,7 @@ help_message = '🤖💬 შეგიძლიათ გამოიყენო
 
 @dp.message_handler(commands=['start', 'help'])
 @rate_limit(2)
-async def send_welcome(message: types.Message):
+async def send_welcome(message: types.Message) -> None:
     logging.info(f'User {message.from_user.id} started bot')
 
     # Create reply keyboard
@@ -55,33 +43,37 @@ async def send_welcome(message: types.Message):
 
 @dp.message_handler(lambda message: message.text == "🤖 ბოტის შესახებ")
 @rate_limit(2, '🤖 ბოტის შესახებ')
-async def send_about(message: types.Message):
+async def send_about(message: types.Message) -> None:
     """Send about message"""
     await message.answer(about_message)
 
 
 @dp.message_handler(lambda message: message.text == "🆘 დახმარება")
 @rate_limit(2, '🆘 დახმარება')
-async def send_help(message: types.Message):
+async def send_help(message: types.Message) -> None:
     """Send manual message"""
     await message.answer(help_message)
 
 
 @dp.message_handler(commands=['current'])
 @rate_limit(5)
-async def current_prices(message: types.Message):
+async def current_prices(message: types.Message) -> None:
     """Send current prices."""
     prices = await get_prices(redis)
-    prices = json.loads(prices)
 
-    formatted_prices = '\n'.join([f'{key} - *{value}*' for key, value in prices.items()])
+    if not prices:
+        await message.answer('დღევანდელი ფასები ვერ მოიძებნა, სცადეთ მოგვიანებით.')
+        return
+
+    prices = json.loads(prices)
+    formatted_prices = format_prices(prices)
 
     await message.answer(f'🤖💬 მიმდინარე ფასები:\n\n{formatted_prices}', parse_mode='Markdown')
 
 
 @dp.message_handler(commands=['subscribe'])
 @rate_limit(5)
-async def subscribe(message: types.Message):
+async def subscribe(message: types.Message) -> None:
     """Subscribe to price notifications."""
     try:
         user = await get_user(message.from_user.id, redis)
@@ -99,7 +91,7 @@ async def subscribe(message: types.Message):
 
 @dp.message_handler(commands=['unsubscribe'])
 @rate_limit(5)
-async def unsubscribe(message: types.Message):
+async def unsubscribe(message: types.Message) -> None:
     """Unsubscribe from price notifications."""
 
     try:

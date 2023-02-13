@@ -1,9 +1,19 @@
 import json
-from datetime import date
+from datetime import date, timedelta
 
 
 async def get_user(user_id, redis):
     return await redis.get(f"user:{user_id}")
+
+
+async def get_subscribed_users(redis):
+    users = []
+
+    for key in await redis.keys("user:*"):
+        user_id = key.decode("utf-8").split(":")[1]
+        users.append(user_id)
+
+    return users
 
 
 async def add_user(user_id, redis):
@@ -18,6 +28,12 @@ async def get_prices(redis):
     today = date.today()
 
     return await redis.get(f"prices:{today}")
+
+
+async def get_yesterday_prices(redis):
+    yesterday = date.today() - timedelta(days=1)
+
+    return await redis.get(f"prices:{yesterday}")
 
 
 async def add_prices(prices, redis):
