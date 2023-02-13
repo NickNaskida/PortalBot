@@ -20,6 +20,26 @@ async def add_user(user_id, redis):
     await redis.set(f"user:{user_id}", 1)
 
 
+async def add_notified_user(user_id, data, redis):
+    today = date.today()
+
+    await redis.set(f"notified:{today}:{user_id}", json.dumps(data))
+    await redis.expire(f"notified:{today}:{user_id}", 60 * 60 * 24 * 3)
+
+
+async def get_notified_users(data, redis):
+    users = []
+
+    for key in await redis.keys("notified:*"):
+        notified_data = await redis.get(key)
+
+        if json.loads(notified_data) == data:
+            user_id = key.decode("utf-8").split(":")[2]
+            users.append(user_id)
+
+    return users
+
+
 async def unsubscribe_user(user_id, redis):
     await redis.delete(f"user:{user_id}")
 

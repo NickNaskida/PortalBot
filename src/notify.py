@@ -5,7 +5,12 @@ import asyncio
 from aiogram import exceptions
 
 from src.config import bot
-from src.redis import get_yesterday_prices, get_subscribed_users
+from src.redis import (
+    get_yesterday_prices,
+    get_subscribed_users,
+    get_notified_users,
+    add_notified_user
+)
 from src.bot import redis
 from src.utils import format_prices, format_price
 
@@ -34,6 +39,7 @@ async def send_notification(user_id, message) -> None:
 
 async def compare_and_notify(data):
     yesterday_prices = await get_yesterday_prices(redis)
+    formatted_data = {}
     change = False
 
     if yesterday_prices:
@@ -46,16 +52,23 @@ async def compare_and_notify(data):
                 change = True
 
             if price < yesterday_price:
-                data[fuel] = f"{price} ↓ ({format_price(float(yesterday_price) - float(price))})"
+                formatted_data[fuel] = f"{price} ・↓({format_price(float(yesterday_price) - float(price))})"
             elif price > yesterday_price:
-                data[fuel] = f"{price} ↑ ({format_price(float(yesterday_price) - float(price))})"
+                formatted_data[fuel] = f"{price} ・↑({format_price(float(yesterday_price) - float(price))})"
 
-        if change:
-            yesterday_prices = format_prices(yesterday_prices)
-            data = format_prices(data)
-            message = f"დაფიქსირდა ფასების ცვლილება:\n\nძველი ფასები:\n\n{yesterday_prices}\n\nახალი ფასები:\n\n{data}"
-            subscribers = await get_subscribed_users(redis)
+        if not change:
+            return
 
-            for user in subscribers:
-                await send_notification(user, message)
-                await asyncio.sleep(.05)
+        formatted_data = format_prices(formatted_data)
+        message = f"🚨💬 დაფიქსირდა ფასების ცვლილება:\n\n{formatted_data}"
+        subscribers = await get_subscribed_users(redis)
+
+        for user in subscribers:
+            notified_users = await get_notified_users(data, redis)
+
+            if user in notified_users:
+                break
+
+            await send_notification(user, message)
+            await add_notified_user(user, data, redis)
+            await asyncio.sleep(.05)

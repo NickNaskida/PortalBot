@@ -26,6 +26,7 @@ def format_prices(prices: dict) -> str:
     :param prices: Prices dict
     :return: Formatted prices
     """
+
     return "\n".join([f"{fuel} - *{price}*" for fuel, price in prices.items()])
 
 
@@ -35,4 +36,4 @@ def format_price(price: float) -> float:
     :param price: Price
     :return: Formatted price
     """
-    return abs(round(price, 2))
+    return "{:.2f}".format(abs(round(price, 2)))
